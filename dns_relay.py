@@ -58,6 +58,7 @@ class DNSFrame:
 
 class DNSUDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
+        start_time = time()
         data = self.request[0].strip()
         dns = DNSFrame(data)
         socket = self.request[1]
@@ -65,7 +66,6 @@ class DNSUDPHandler(socketserver.BaseRequestHandler):
 
         name = dns.getname()
         print('%+50s'%name,end='\t')
-        start_time = time()
         if name in namemap:
             ip = namemap[name]
             dns.setip(ip)
