@@ -80,11 +80,11 @@ class DNSUDPHandler(socketserver.BaseRequestHandler):
             except Exception:
                 ip = '0.0.0.0'
                 socket.sendto(data, self.client_address)    #ignore
-                print('    RELAY','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
             else:
                 ip = answer[0].address
                 dns.setip(ip)
                 socket.sendto(dns.getbytes(), self.client_address)
+            finally:
                 print('    RELAY','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
 
 class DNSServer:
