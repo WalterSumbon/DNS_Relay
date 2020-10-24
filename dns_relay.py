@@ -1,6 +1,7 @@
 import socketserver
 import struct
 from dns import resolver
+from time import time
 # DNS Query
 class DNSQuery:
     def __init__(self, data):
@@ -22,7 +23,6 @@ class DNSQuery:
         return self.querybytes + struct.pack('>HH', self.type, self.classify)
 
 # DNS Answer RRS
-# this class is also can be use as Authority RRS or Additional RRS
 class DNSAnswer:
     def __init__(self, ip):
         self.name = 0xc00c
@@ -39,7 +39,7 @@ class DNSAnswer:
         return res
 
 # DNS frame
-# must initialized by a DNS query frame
+# must be initialized by a DNS query frame
 class DNSFrame:
     def __init__(self, data):
         self.id, self.flags, self.quests, self.answers, self.author, self.addition = struct.unpack('>HHHHHH', data[0:12])
@@ -63,49 +63,60 @@ class DNSUDPHandler(socketserver.BaseRequestHandler):
         dns = DNSFrame(data)
         socket = self.request[1]
         namemap = DNSServer.namemap
-        if(dns.query.type==1):
-            # If this is querying an A record, then response it
-            name = dns.getname()
+        name = dns.getname()
+        print('%+50s'%name,end='\t')
+        start_time = time()
+        if(dns.query.type==1):  # A-query
             if name in namemap:
-                # If have record, response it
+                ip = namemap[name]
                 dns.setip(namemap[name])
                 socket.sendto(dns.getbytes(), self.client_address)
+                if ip == '0.0.0.0':
+                    print('INTERCEPT','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
+                else:
+                    print(' RESOLVED','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
             else:
                 try:
                     answer = DNSServer.res.query(name)
                 except Exception:
+                    ip = '0.0.0.0'
                     socket.sendto(data, self.client_address)    #ignore
+                    print('    RELAY','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
                 else:
-                    dns.setip(answer[0].address)
+                    ip = answer[0].address
+                    dns.setip(ip)
+                    DNSServer.addname(name, ip)
                     socket.sendto(dns.getbytes(), self.client_address)
+                    print('    RELAY','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
         else:
-            # If this is not query a A record, ignore it
-            socket.sendto(data, self.client_address)
+            ip = '0.0.0.0'
+            socket.sendto(data, self.client_address)    #ignore
+            print('   UNKWON','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
 
-# DNS Server
-# It only support A record query
-# user it, U can create a simple DNS server
+# Support A record query only
 class DNSServer:
-    def __init__(self, port=53):
-        DNSServer.namemap = {}
+    def __init__(self, port=53, config = 'config'):
+        DNSServer.config = config
+        DNSServer.namemap = {} #dict<str,str>
+        DNSServer.read_config()
         DNSServer.res = resolver.Resolver()
         DNSServer.res.nameservers = ['114.114.114.114']
         self.port = port
-    def addname(self, name, ip):
-        DNSServer.namemap[name] = ip
+    @classmethod
+    def read_config(cls):
+        with open(cls.config, 'r') as f:
+            for line in f:
+                ip, name = line.split(' ')
+                cls.namemap[name.strip()] = ip.strip()
+    @classmethod
+    def addname(cls, name, ip):
+        cls.namemap[name] = ip
     def start(self):
-        HOST, PORT = "0.0.0.0", self.port
+        HOST, PORT = "0.0.0.0", self.port     #run server on localhost???
         server = socketserver.UDPServer((HOST, PORT), DNSUDPHandler)
         server.serve_forever()
 
 # Now, test it
 if __name__ == "__main__":
     sev = DNSServer()
-    sev.addname('www.aa.com', '192.168.0.1')    # add a A record
-    sev.addname('www.bb.com', '192.168.0.2')    # add a A record
-    sev.addname('www.ckms.com', '192.168.0.3') # add a A record
-    sev.addname("img-home.csdnimg.cn",'0.0.0.0')
     sev.start() # start DNS server
-
-# Now, U can use "nslookup" command to test it
-# Such as "nslookup www.aa.com"
