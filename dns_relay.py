@@ -19,7 +19,7 @@ class DNSQuery:
         self.querybytes = data[0:i + 1]
         self.type, self.classify = struct.unpack('>HH', data[i + 1:i + 5])
         self.len = i + 5
-    def getbytes(self):
+    def get_bytes(self):
         return self.querybytes + struct.pack('>HH', self.type, self.classify)
 
 # DNS Answer RRS
@@ -31,7 +31,7 @@ class DNSAnswer:
         self.timetolive = 190
         self.datalength = 4
         self.ip = ip
-    def getbytes(self):
+    def get_bytes(self):
         """ip -> DNS response: bytes"""
         res = struct.pack('>HHHLH', self.name, self.type, self.classify, self.timetolive, self.datalength)
         s = self.ip.split('.')
@@ -43,17 +43,17 @@ class DNSFrame:
     def __init__(self, data):
         self.id, self.flags, self.quests, self.answers, self.author, self.addition = struct.unpack('>HHHHHH', data[0:12])
         self.query = DNSQuery(data[12:])
-    def getname(self):
+    def get_name(self):
         return self.query.name
-    def setip(self, ip):
+    def set_answer(self, ip):
         self.answer = DNSAnswer(ip)
         self.answers = 1
         self.flags = 0x8180
-    def getbytes(self):
+    def get_bytes(self):
         res = struct.pack('>HHHHHH', self.id, self.flags, self.quests, self.answers, self.author, self.addition)
-        res = res + self.query.getbytes()
+        res = res + self.query.get_bytes()
         if self.answers != 0:
-            res = res + self.answer.getbytes()
+            res = res + self.answer.get_bytes()
         return res
 
 class DNSUDPHandler(socketserver.BaseRequestHandler):
@@ -64,12 +64,12 @@ class DNSUDPHandler(socketserver.BaseRequestHandler):
         socket = self.request[1]
         namemap = DNSServer.namemap
 
-        name = dns.getname()
+        name = dns.get_name()
         print('%+50s'%name,end='\t')
         if name in namemap:
             ip = namemap[name]
-            dns.setip(ip)
-            socket.sendto(dns.getbytes(), self.client_address)
+            dns.set_answer(ip)
+            socket.sendto(dns.get_bytes(), self.client_address)
             if ip == '0.0.0.0':
                 print('INTERCEPT','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
             else:
@@ -82,8 +82,8 @@ class DNSUDPHandler(socketserver.BaseRequestHandler):
                 socket.sendto(data, self.client_address)    #ignore
             else:
                 ip = answer[0].address
-                dns.setip(ip)
-                socket.sendto(dns.getbytes(), self.client_address)
+                dns.set_answer(ip)
+                socket.sendto(dns.get_bytes(), self.client_address)
             finally:
                 print('    RELAY','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
 
@@ -102,7 +102,7 @@ class DNSServer:
                 ip, name = line.split(' ')
                 cls.namemap[name.strip()] = ip.strip()
     @classmethod
-    def addname(cls, name, ip):
+    def add_name(cls, name, ip):
         cls.namemap[name] = ip
     def start(self):
         HOST, PORT = "0.0.0.0", self.port     #run server on localhost???
