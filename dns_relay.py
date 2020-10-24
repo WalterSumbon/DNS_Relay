@@ -38,7 +38,6 @@ class DNSAnswer:
         res = res + struct.pack('BBBB', int(s[0]), int(s[1]), int(s[2]), int(s[3]))
         return res
 
-# DNS frame
 # must be initialized by a DNS query frame
 class DNSFrame:
     def __init__(self, data):
@@ -56,44 +55,38 @@ class DNSFrame:
         if self.answers != 0:
             res = res + self.answer.getbytes()
         return res
-# A UDPHandler to handle DNS query
+
 class DNSUDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         data = self.request[0].strip()
         dns = DNSFrame(data)
         socket = self.request[1]
         namemap = DNSServer.namemap
+
         name = dns.getname()
         print('%+50s'%name,end='\t')
         start_time = time()
-        if(dns.query.type==1):  # A-query
-            if name in namemap:
-                ip = namemap[name]
-                dns.setip(namemap[name])
-                socket.sendto(dns.getbytes(), self.client_address)
-                if ip == '0.0.0.0':
-                    print('INTERCEPT','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
-                else:
-                    print(' RESOLVED','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
+        if name in namemap:
+            ip = namemap[name]
+            dns.setip(ip)
+            socket.sendto(dns.getbytes(), self.client_address)
+            if ip == '0.0.0.0':
+                print('INTERCEPT','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
             else:
-                try:
-                    answer = DNSServer.res.query(name)
-                except Exception:
-                    ip = '0.0.0.0'
-                    socket.sendto(data, self.client_address)    #ignore
-                    print('    RELAY','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
-                else:
-                    ip = answer[0].address
-                    dns.setip(ip)
-                    DNSServer.addname(name, ip)
-                    socket.sendto(dns.getbytes(), self.client_address)
-                    print('    RELAY','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
+                print(' RESOLVED','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
         else:
-            ip = '0.0.0.0'
-            socket.sendto(data, self.client_address)    #ignore
-            print('  UNKNOWN','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
+            try:
+                answer = DNSServer.res.query(name)
+            except Exception:
+                ip = '0.0.0.0'
+                socket.sendto(data, self.client_address)    #ignore
+                print('    RELAY','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
+            else:
+                ip = answer[0].address
+                dns.setip(ip)
+                socket.sendto(dns.getbytes(), self.client_address)
+                print('    RELAY','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
 
-# Support A record query only
 class DNSServer:
     def __init__(self, port=53, config = 'config'):
         DNSServer.config = config
