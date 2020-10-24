@@ -1,2 +1,3 @@
 # DNS_Relay
- DNS Relay
+ Homework for USTC Computer Networking Course-2020.
+
