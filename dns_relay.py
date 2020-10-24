@@ -91,7 +91,7 @@ class DNSUDPHandler(socketserver.BaseRequestHandler):
         else:
             ip = '0.0.0.0'
             socket.sendto(data, self.client_address)    #ignore
-            print('   UNKWON','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
+            print('  UNKNOWN','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
 
 # Support A record query only
 class DNSServer:
