@@ -1,8 +1,8 @@
-import socketserver
 import struct
-from dns import resolver
+import socketserver
 from time import time
-# DNS Query
+from dns import resolver
+
 class DNSQuery:
     def __init__(self, data):
         i = 1
@@ -22,7 +22,6 @@ class DNSQuery:
     def get_bytes(self):
         return self.querybytes + struct.pack('>HH', self.type, self.classify)
 
-# DNS Answer RRS
 class DNSAnswer:
     def __init__(self, ip):
         self.name = 0xc00c
@@ -45,11 +44,12 @@ class DNSFrame:
         self.query = DNSQuery(data[12:])
     def get_name(self):
         return self.query.name
-    def set_answer(self, ip):
+    def generate_answer(self, ip):
         self.answer = DNSAnswer(ip)
         self.answers = 1
         self.flags = 0x8180
     def get_bytes(self):
+        """bytes of the answer"""
         res = struct.pack('>HHHHHH', self.id, self.flags, self.quests, self.answers, self.author, self.addition)
         res = res + self.query.get_bytes()
         if self.answers != 0:
@@ -68,7 +68,7 @@ class DNSUDPHandler(socketserver.BaseRequestHandler):
         print('%+50s'%name,end='\t')
         if name in namemap:
             ip = namemap[name]
-            dns.set_answer(ip)
+            dns.generate_answer(ip)
             socket.sendto(dns.get_bytes(), self.client_address)
             if ip == '0.0.0.0':
                 print('INTERCEPT','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
@@ -82,7 +82,7 @@ class DNSUDPHandler(socketserver.BaseRequestHandler):
                 socket.sendto(data, self.client_address)    #ignore
             else:
                 ip = answer[0].address
-                dns.set_answer(ip)
+                dns.generate_answer(ip)
                 socket.sendto(dns.get_bytes(), self.client_address)
             finally:
                 print('    RELAY','%15s'%ip,'%fs'%(time()-start_time),sep='\t')
